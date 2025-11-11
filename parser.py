@@ -1,6 +1,6 @@
 import re
 import pytesseract
-from configs import configs
+from data_var import data_var
 from utils import to_csv
 from tkinter import messagebox
 from pdf2image import convert_from_path
@@ -19,24 +19,19 @@ RE_KVP = re.compile(
     r"Valor:[\s]+R\$\s*(?P<VALOR>[\d.,]+)"
     , re.DOTALL | re.IGNORECASE | re.MULTILINE | re.UNICODE)
 
-def process(path, progress_bar, status_label, process_button):
-    """Executa o OCR de forma assíncrona."""
+def process(path, feedback):
     images = convert_from_path(path, dpi=300)
     total = len(images)
     for i, image in enumerate(images, start=1):
-        status_label.config(text=f"Processando página {i}/{total}...")
-        config = f'--oem 1 --psm 6 --tessdata-dir {configs["TRAINED_DATA_DIR"]}'
+        feedback["status_label"].config(text=f"Processando página {i}/{total}...")
+        config = f'--oem 1 --psm 6 --tessdata-dir {data_var["TRAINED_DATA_DIR"]}'
         text_pdf = pytesseract.image_to_string(image, lang='por', config=config)
-        try:
-            parsed_pdf = parse_pdf(text_pdf)
-            to_csv(parsed_pdf)
-        except:
-            return
-        progress_bar['value'] = (i / total) * 100
-        progress_bar.update()
+        parsed_pdf = parse_pdf(text_pdf)
+        to_csv(parsed_pdf)
+        feedback["progress_bar"]['value'] = (i / total) * 100
+        feedback["progress_bar"].update()
 
-    status_label.config(text="✅ Processamento concluído!")
-    process_button.config(state="normal")
+    feedback["status_label"].config(text="✅ Processamento concluído!")
     messagebox.showinfo("Concluído", "Conversão finalizada e CSV gerado.")
 
 

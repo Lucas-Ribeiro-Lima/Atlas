@@ -1,8 +1,9 @@
-from window import render
+from window import Window
 
 def main():
     try:
-        render()
+        window = Window()
+        window.render()
     except Exception as e:
         print("Erro fatal:", e)
 
