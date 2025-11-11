@@ -1,5 +1,9 @@
 import re
 import pytesseract
+import threading
+import time
+
+from os import path
 from data_var import data_var
 from utils import to_csv
 from tkinter import messagebox
@@ -19,32 +23,86 @@ RE_KVP = re.compile(
     r"Valor:[\s]+R\$\s*(?P<VALOR>[\d.,]+)"
     , re.DOTALL | re.IGNORECASE | re.MULTILINE | re.UNICODE)
 
+
+def handle_process(feedback):
+    if not path.exists(data_var["BASE_PATH"]):
+        messagebox.showerror("Erro", "Caminho do PDF inválido.")
+        return
+
+    feedback["process_button"]["text"] = "Processando..."
+    feedback["process_button"]["state"] = "disabled"
+    feedback["cancel_button"]["state"] = "normal"
+    feedback["progress_bar"]['value'] = 0
+
+    def worker():
+        try:
+            feedback["info"]()
+            process(data_var["BASE_PATH"], feedback)
+        except Exception as e:
+            feedback["status_label"]["text"] = f"❌ Erro: {e}"
+            feedback["progress_bar"]['value'] = 0
+        finally:
+            feedback["process_button"]["state"] = "normal"
+            feedback["process_button"]["text"] = "Processar"
+            feedback["cancel_button"]["state"] = "disabled"
+            feedback["info"]()
+
+    threading.Thread(target=worker, daemon=True).start()
+
+estimative_per_page = 10
+
+
 def process(path, feedback):
+    global estimative_per_page
+
+    feedback["status_label"]["text"] = "Convertendo PDF para imagens..."
     images = convert_from_path(path, dpi=300)
+
     total = len(images)
+    success_pages = 0
     for i, image in enumerate(images, start=1):
-        feedback["status_label"].config(text=f"Processando página {i}/{total}...")
+        start_time = time.perf_counter()
+        total_estimative = total * estimative_per_page
+
+        feedback["timer_label"][
+            "text"] = f"Tempo estimado: {round(total_estimative - (i * estimative_per_page))} segundos"
+        feedback["status_label"].config(text=f"Processando página {i}/{total}")
+
         config = f'--oem 1 --psm 6 --tessdata-dir {data_var["TRAINED_DATA_DIR"]}'
-        text_pdf = pytesseract.image_to_string(image, lang='por', config=config)
-        parsed_pdf = parse_pdf(text_pdf)
-        to_csv(parsed_pdf)
+        page_text = pytesseract.image_to_string(image, lang='por', config=config)
+
+        try:
+            parsed_paged = parse_page(page_text)
+            to_csv(parsed_paged)
+            success_pages += 1
+        except Exception:
+            print(f"Error on page: {i}")
+        finally:
+            feedback["extracted_pages"]["text"] = success_pages
+            feedback["error_pages"]["text"] = i - success_pages
+
         feedback["progress_bar"]['value'] = (i / total) * 100
         feedback["progress_bar"].update()
+        estimative_per_page = time.perf_counter() - start_time
 
     feedback["status_label"].config(text="✅ Processamento concluído!")
-    messagebox.showinfo("Concluído", "Conversão finalizada e CSV gerado.")
+    feedback["timer_label"]["text"] = ""
+    messagebox.showinfo("Concluído",
+                        f"Conversão finalizada e CSV gerado.\n"
+                        f"Páginas extraidas: {success_pages}\n"
+                        f"Páginas com erro: {total - success_pages}\n")
 
 
-def parse_pdf(pdf_data):
-    text_pos_processed = pos_processing_text(pdf_data)
+def parse_page(page_text):
+    text_pos_processed = pos_processing_text(page_text)
     match = re.search(RE_KVP, text_pos_processed)
     if not match:
-        raise Exception("Invalid PDF")
+        raise Exception("Invalid page")
 
     return match.groupdict()
+
 
 def pos_processing_text(text):
     p1 = re.sub(r"[-—|°º]", " ", text)
     p2 = p1.replace("ç", "c").replace("ã", "a").replace("í", "i").replace("á", "a")
     return p2
-

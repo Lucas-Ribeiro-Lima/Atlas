@@ -1,184 +1,121 @@
 import tkinter as tk
-import threading
-from os import path
-from tkinter import ttk, filedialog, messagebox
+
+from tkinter import ttk
 from data_var import data_var
-from parser import process
+from parser import handle_process
+from utils import set_configuration_filename
+from config import Config
 
-class Window:
+class App(tk.Tk):
     def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("Atlas")
-        self.root.geometry("480x240")
-        self.root.resizable(False, False)
-        self.config_window = None
-        self.config_window_is_open = False
+        super().__init__()
+        super().title("Atlas")
+        super().geometry("480x280")
+        super().resizable(False, False)
+        self.main = None
+        self.feedback = {}
+        self.sub_windows_status = {}
 
-        # ======= Topbar com botão de config =======
-        topbar = ttk.Frame(self.root, padding=5)
+    def main_render(self):
+        """Área principal"""
+        self.main = ttk.Frame(self, padding=15)
+        self.main.pack(fill="both", expand=True)
+
+    def top_bar_render(self):
+        """Top bar rendering function."""
+        topbar = ttk.Frame(self, padding=5)
         topbar.pack(fill="both", expand=True)
-        ttk.Label(topbar, text="Atlas OCR PDF → CSV", font=("Segoe UI", 12, "bold")).pack(side="left")
-        ttk.Button(topbar, text="⚙️", command=self.open_config).pack(side="right")
+        ttk.Label(topbar,
+                  text="Atlas OCR PDF → CSV",
+                  font=("Segoe UI", 12, "bold")).pack(side="left")
+        ttk.Button(topbar, text="⚙️", command=lambda: self.open_sub_window(Config)).pack(side="right")
 
-        # ======= Área principal =======
-        main = ttk.Frame(self.root, padding=15)
-        main.pack(fill="both", expand=True)
-
+    def pdf_entry_render(self):
         # ==========  Arquivo de entrada ==========
-        pdf_entry = ttk.Entry(main, width=55)
+        pdf_entry = ttk.Entry(self.main, width=55)
         pdf_entry.insert(0, data_var["BASE_PATH"])
         pdf_entry.grid(row=0, column=0, pady=5, sticky="w")
 
         # ============ Botão de selecionar o arquivo ===========
-        select_btn = ttk.Button(main, text="Selecionar PDF's",
-                                command=lambda: set_configuration(pdf_entry, "BASE_PATH"), width=15)
+        select_btn = ttk.Button(self.main, text="Selecionar PDF's",
+                                command=lambda: set_configuration_filename(pdf_entry, "BASE_PATH"), width=15)
         select_btn.grid(row=0, column=1, padx=5, pady=10)
 
+    def actions_render(self):
         # ========== Botão de processamento ========
-        process_button = ttk.Button(main, text="Processar", width=15)
+        process_button = ttk.Button(self.main, text="Processar", width=15)
         process_button.grid(row=1, column=1, pady=10, padx=5)
+        process_button.config(command=lambda: handle_process(self.feedback))
 
-        cancel_button = ttk.Button(main, text="Cancelar", width=15)
+        cancel_button = ttk.Button(self.main, text="Cancelar", width=15)
         cancel_button.grid(row=1, column=0, pady=10, padx=5, sticky="e")
         cancel_button["state"] = "disabled"
 
-        # ========== Informações gerais ==============
-        info = ttk.Frame(self.root, padding=5)
+        self.feedback["process_button"] = process_button
+        self.feedback["cancel_button"] = cancel_button
 
-        ttk.Label(info, text="Páginas extraidas: ").grid(row=0, column=0, pady=5, padx=5, sticky="w")
-        extracted_pages = ttk.Label(info, text=" ").grid(row=0, column=1, pady=5, padx=5, sticky="w")
+    def general_info_render(self):
+        # ========== Informações gerais ==============
+        info = ttk.Frame(self.main, padding=5)
+        self.sub_windows_status["info"] = False
+
+        ttk.Label(info, text="Páginas extraídas: ").grid(row=0, column=0, pady=5, padx=5, sticky="w")
+        extracted_pages = ttk.Label(info, text="0")
+        extracted_pages.grid(row=0, column=1, pady=5, padx=5, sticky="w")
 
         ttk.Label(info, text="Páginas com erro: ").grid(row=1, column=0, pady=5, padx=5, sticky="w")
-        error_pages = ttk.Label(info, text=" ").grid(row=1, column=1, pady=5, padx=5, sticky="w")
+        error_pages = ttk.Label(info, text="0")
+        error_pages.grid(row=1, column=1, pady=5, padx=5, sticky="w")
+
+        def toggle_info():
+            if self.sub_windows_status["info"]:
+                info.pack_forget()
+                self.sub_windows_status["info"] = False
+            else:
+                info.grid(row=2, column=0, pady=5, sticky="w")
+                self.sub_windows_status["info"] = True
+
+        self.feedback["info"] = toggle_info
+        self.feedback["extracted_pages"] = extracted_pages
+        self.feedback["error_pages"] = error_pages
+
+    def status_bar_render(self):
+        frm = ttk.Frame(self)
+        frm.pack(fill="both", expand=True, side="bottom")
 
         # ======= Barra de progresso =======
-        progress_bar = ttk.Progressbar(self.root, orient="horizontal", length=400, mode="determinate")
-        progress_bar.pack(fill="x", side="bottom")
+        progress_bar = ttk.Progressbar(frm, orient="horizontal", length=400, mode="determinate")
+        progress_bar.pack(side="bottom", fill="x")
 
         # ======= Status =======
-        status_label = ttk.Label(self.root, text="", relief="flat", anchor="w")
-        status_label.pack(fill="x", side="bottom")
+        status_label = ttk.Label(frm, text="", relief="flat")
+        status_label.pack(side="left", anchor="w")
 
-        timer_label = ttk.Label(self.root, text="Time remaining: ", relief="flat", anchor="e")
-        timer_label.pack(fill="x", side="bottom")
+        timer_label = ttk.Label(frm, text="", relief="flat")
+        timer_label.pack(side="right", anchor="w")
 
-        timer_value = ttk.Label(self.root, text="", relief="flat", anchor="e")
-        timer_value.pack(fill="x", side="bottom")
+        self.feedback["progress_bar"] = progress_bar
+        self.feedback["status_label"] = status_label
+        self.feedback["timer_label"] = timer_label
 
-        feedback = {
-            "process_button": process_button,
-            "cancel_button": cancel_button,
-            "progress_bar": progress_bar,
-            "status_label": status_label,
-            "extracted_pages": extracted_pages,
-            "error_pages": error_pages
-        }
 
-        process_button.config(command=lambda: handle_process(feedback))
-
-    def open_config(self):
-        if self.config_window_is_open:
+    def open_sub_window(self, sub_window):
+        if self.sub_windows_status.get(sub_window):
             return
 
-        self.config_window_is_open = True
-        self.config_window = tk.Toplevel()
-        self.config_window.title("Configurações")
-        self.config_window.geometry("480x240")
-        self.config_window.resizable(False, False)
-        self.config_window.protocol("WM_DELETE_WINDOW", self.close_config_window)
+        def on_close_cb():
+            self.sub_windows_status[sub_window] = False
 
-        frm = ttk.Frame(self.config_window, padding=15)
-        frm.pack(fill="both", expand=True)
+        self.sub_windows_status[sub_window] = True
+        sub_window(on_close_cb)
 
-        # === TRAINED DATA ===
-        ttk.Label(frm, text="Pasta de dados treinados (Tesseract):").grid(row=0, column=0, sticky="w")
-        trained_entry = ttk.Entry(frm, width=65)
-        trained_entry.insert(0, data_var["TRAINED_DATA_DIR"])
-        trained_entry.grid(row=1, column=0, pady=5, sticky="w")
-        trained_btn = tk.Button(frm,
-                                text="📁",
-                                width=3,
-                                command=lambda: set_directory(trained_entry,
-                                                              "Selecione a pasta de dados treinados (Tesseract)"))
-        trained_btn.grid(row=1, column=1)
-
-        # === OUTPUT CSV ===
-        ttk.Label(frm, text="Caminho do CSV de saída:").grid(row=2, column=0, sticky="w", pady=(10, 0))
-        csv_entry = ttk.Entry(frm, width=65)
-        csv_entry.insert(0, data_var["OUTPUT_CSV"])
-        csv_entry.grid(row=3, column=0, padx=(0, 10), pady=5, sticky="w")
-        csv_btn = ttk.Button(frm,
-                             text="📁",
-                             width=3,
-                             command=lambda: set_save_file(csv_entry,
-                                                      "Selecione o arquivo CSV de saída", ".csv"))
-        csv_btn.grid(row=3, column=1)
-
-        # === SAVE BUTTON ===
-        def save_config():
-            data_var["TRAINED_DATA_DIR"] = trained_entry.get()
-            data_var["OUTPUT_CSV"] = csv_entry.get()
-            messagebox.showinfo("Configurações", "Configurações salvas com sucesso.")
-            self.close_config_window()
-
-        ttk.Button(frm, text="Salvar", command=save_config).grid(row=4, column=0, columnspan=2, pady=15, sticky="e")
-
-    def close_config_window(self):
-        self.config_window_is_open = False
-        self.config_window.destroy()
 
     def render(self):
-        self.root.mainloop()
+        self.top_bar_render()
+        self.main_render()
+        self.pdf_entry_render()
+        self.actions_render()
+        self.general_info_render()
+        self.status_bar_render()
+        self.mainloop()
 
-
-def set_configuration(entry, label):
-    selected = filedialog.askopenfilename(
-        title="Selecione o PDF",
-        defaultextension=".pdf"
-    )
-    if selected:
-        data_var[label] = selected
-        entry.delete(0, tk.END)
-        entry.insert(0, data_var[label])
-
-
-def set_directory(entry, message):
-    path_dir = filedialog.askdirectory(title=message)
-    if path_dir:
-        entry.delete(0, tk.END)
-        entry.insert(0, path_dir)
-
-
-def set_save_file(entry, message, type):
-    path_file = filedialog.asksaveasfilename(
-        title=message,
-        defaultextension=type,
-        filetypes=[("", type)]
-    )
-    if path_file:
-        entry.delete(0, tk.END)
-        entry.insert(0, path_file)
-
-
-def handle_process(feedback):
-    if not path.exists(data_var["BASE_PATH"]):
-        messagebox.showerror("Erro", "Caminho do PDF inválido.")
-        return
-
-    feedback["process_button"]["text"] = "Processando"
-    feedback["process_button"]["state"] = "disabled"
-    feedback["cancel_button"]["state"] = "normal"
-    feedback["status_label"]["text"] = "Convertendo PDF para imagens..."
-    feedback["progress_bar"]['value'] = 0
-
-    def worker():
-        try:
-            process(data_var["BASE_PATH"], feedback)
-        except Exception as e:
-            feedback["status_label"]["text"] = f"❌ Erro: {e}"
-            feedback["progress_bar"]['value'] = 100
-        finally:
-            feedback["process_button"]["state"] = "normal"
-            feedback["cancel_button"]["state"] = "disabled"
-
-    threading.Thread(target=worker, daemon=True).start()

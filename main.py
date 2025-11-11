@@ -1,11 +1,14 @@
-from window import Window
+from window import App
+
 
 def main():
     try:
-        window = Window()
-        window.render()
+        app = App()
+        app.render()
     except Exception as e:
-        print("Erro fatal:", e)
+        print(e)
+        return -1
+    return 0
 
 if __name__ == "__main__":
     main()
