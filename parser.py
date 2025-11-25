@@ -3,13 +3,13 @@ import pytesseract
 import threading
 import time
 
-from os import path
+from os import path, listdir
 from data_var import data_var
 from utils import to_csv
 from tkinter import messagebox
 from pdf2image import convert_from_path
 
-RE_KVP = re.compile(
+_RE_KVP = re.compile(
     r"Data\s+de\s+Emissao\s+(?P<DAT_EMISS>\d{2}/\d{2}/\d{4}).*"
     r"Data\s+do\s+Vencimento\s+(?P<DAT_VENC>\d{2}/\d{2}/\d{4}).*"
     r"N\s*Auto\s+de\s+Infracao:?\s+(?P<AI>\w{6,7}).*"
@@ -37,7 +37,7 @@ def handle_process(feedback):
     def worker():
         try:
             feedback["info"]()
-            process(data_var["BASE_PATH"], feedback)
+            _process(data_var["BASE_PATH"], feedback)
         except Exception as e:
             feedback["status_label"]["text"] = f"❌ Erro: {e}"
             feedback["progress_bar"]['value'] = 0
@@ -49,60 +49,85 @@ def handle_process(feedback):
 
     threading.Thread(target=worker, daemon=True).start()
 
-estimative_per_page = 10
+estimative_per_file = 120
 
 
-def process(path, feedback):
-    global estimative_per_page
+def _process(dir_path, feedback):
+    global estimative_per_file
 
-    feedback["status_label"]["text"] = "Convertendo PDF para imagens..."
-    images = convert_from_path(path, dpi=300)
-
-    total = len(images)
+    files = listdir(dir_path)
+    total_files = len(files)
     success_pages = 0
-    for i, image in enumerate(images, start=1):
+    total_pages = 0
+
+    for i, file in enumerate(files):
         start_time = time.perf_counter()
-        total_estimative = total * estimative_per_page
+        total_estimative = total_files * estimative_per_file
 
         feedback["timer_label"][
-            "text"] = f"Tempo estimado: {round(total_estimative - (i * estimative_per_page))} segundos"
-        feedback["status_label"].config(text=f"Processando página {i}/{total}")
+            "text"] = f"Tempo estimado: {round(total_estimative - (i * estimative_per_file))} segundos"
+        feedback["status_label"].config(text=f"Processando arquivo {i}/{total_files}")
 
-        config = f'--oem 1 --psm 6 --tessdata-dir {data_var["TRAINED_DATA_DIR"]}'
-        page_text = pytesseract.image_to_string(image, lang='por', config=config)
+        file_path = path.join(dir_path, file)
+        [ success, total ] = _process_file(file_path, feedback)
 
-        try:
-            parsed_paged = parse_page(page_text)
-            to_csv(parsed_paged)
-            success_pages += 1
-        except Exception:
-            print(f"Error on page: {i}")
-        finally:
-            feedback["extracted_pages"]["text"] = success_pages
-            feedback["error_pages"]["text"] = i - success_pages
+        success_pages += success
+        total_pages += total
 
-        feedback["progress_bar"]['value'] = (i / total) * 100
+        feedback["extracted_pages"]["text"] = success_pages
+        feedback["error_pages"]["text"] = total_pages - success_pages
+
+        feedback["progress_bar"]['value'] = (i / total_files) * 100
         feedback["progress_bar"].update()
-        estimative_per_page = time.perf_counter() - start_time
+
+        estimative_per_file = time.perf_counter() - start_time
+
 
     feedback["status_label"].config(text="✅ Processamento concluído!")
     feedback["timer_label"]["text"] = ""
     messagebox.showinfo("Concluído",
                         f"Conversão finalizada e CSV gerado.\n"
                         f"Páginas extraidas: {success_pages}\n"
-                        f"Páginas com erro: {total - success_pages}\n")
+                        f"Páginas com erro: {total_pages - success_pages}\n")
 
 
-def parse_page(page_text):
-    text_pos_processed = pos_processing_text(page_text)
-    match = re.search(RE_KVP, text_pos_processed)
+def _process_file(file, feedback):
+    feedback["status_file"].config(text=f"   ======    Convertendo arquivo para imagens")
+    images = convert_from_path(file, dpi=300)
+
+    total_pages = len(images)
+    success_pages = 0
+    for i, image in enumerate(images, start=1):
+        config = f'--oem 1 --psm 6 --tessdata-dir {data_var["TRAINED_DATA_DIR"]}'
+        page_text = pytesseract.image_to_string(image, lang='por', config=config)
+
+        feedback["status_file"].config(text=f"   ======    Processando página {i}/{total_pages}")
+        success_pages += _process_page(page_text, i)
+
+    return [ success_pages, total_pages ]
+
+
+def _process_page(page_text, page_number):
+    try:
+        parsed_paged = _parse_page(page_text)
+        to_csv(parsed_paged)
+        return 1
+    except Exception:
+        print(f"Error on page: {page_number}")
+        return 0
+
+
+def _parse_page(page_text):
+    text_pos_processed = _pos_processing_text(page_text)
+    match = re.search(_RE_KVP, text_pos_processed)
     if not match:
-        raise Exception("Invalid page")
+         raise Exception("Invalid page")
+    to_csv(match.group())
 
     return match.groupdict()
 
 
-def pos_processing_text(text):
+def _pos_processing_text(text):
     p1 = re.sub(r"[-—|°º]", " ", text)
     p2 = p1.replace("ç", "c").replace("ã", "a").replace("í", "i").replace("á", "a")
     return p2

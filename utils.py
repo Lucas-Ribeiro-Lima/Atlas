@@ -17,16 +17,6 @@ def to_csv(kvp_dict):
             writer.writeheader()
         writer.writerow(kvp_dict)
 
-def set_configuration_filename(entry, label):
-    selected = filedialog.askopenfilename(
-        title="Selecione o PDF",
-        defaultextension=".pdf"
-    )
-    if selected:
-        data_var[label] = selected
-        entry.delete(0, tk.END)
-        entry.insert(0, data_var[label])
-
 def set_configuration_directory(entry, label):
     path_dir = filedialog.askdirectory()
     if path_dir:

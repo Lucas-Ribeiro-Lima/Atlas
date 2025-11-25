@@ -3,45 +3,55 @@ import tkinter as tk
 from tkinter import ttk
 from data_var import data_var
 from parser import handle_process
-from utils import set_configuration_filename
+from utils import set_configuration_directory
 from config import Config
 
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
         super().title("Atlas")
-        super().geometry("480x280")
+        super().geometry("640x280")
         super().resizable(False, False)
         self.main = None
         self.feedback = {}
         self.sub_windows_status = {}
 
-    def main_render(self):
+    def render(self):
+        self._top_bar_render()
+        self._main_render()
+        self._pdf_entry_render()
+        self._actions_render()
+        self._general_info_render()
+        self._status_bar_render()
+        self.mainloop()
+
+
+    def _main_render(self):
         """Área principal"""
         self.main = ttk.Frame(self, padding=15)
         self.main.pack(fill="both", expand=True)
 
-    def top_bar_render(self):
+    def _top_bar_render(self):
         """Top bar rendering function."""
         topbar = ttk.Frame(self, padding=5)
         topbar.pack(fill="both", expand=True)
         ttk.Label(topbar,
                   text="Atlas OCR PDF → CSV",
                   font=("Segoe UI", 12, "bold")).pack(side="left")
-        ttk.Button(topbar, text="⚙️", command=lambda: self.open_sub_window(Config)).pack(side="right")
+        ttk.Button(topbar, text="⚙️", command=lambda: self._open_sub_window(Config)).pack(side="right")
 
-    def pdf_entry_render(self):
+    def _pdf_entry_render(self):
         # ==========  Arquivo de entrada ==========
         pdf_entry = ttk.Entry(self.main, width=55)
         pdf_entry.insert(0, data_var["BASE_PATH"])
         pdf_entry.grid(row=0, column=0, pady=5, sticky="w")
 
         # ============ Botão de selecionar o arquivo ===========
-        select_btn = ttk.Button(self.main, text="Selecionar PDF's",
-                                command=lambda: set_configuration_filename(pdf_entry, "BASE_PATH"), width=15)
+        select_btn = ttk.Button(self.main, text="Selecionar diretório",
+                                command=lambda: set_configuration_directory(pdf_entry, "BASE_PATH"), width=25)
         select_btn.grid(row=0, column=1, padx=5, pady=10)
 
-    def actions_render(self):
+    def _actions_render(self):
         # ========== Botão de processamento ========
         process_button = ttk.Button(self.main, text="Processar", width=15)
         process_button.grid(row=1, column=1, pady=10, padx=5)
@@ -54,7 +64,7 @@ class App(tk.Tk):
         self.feedback["process_button"] = process_button
         self.feedback["cancel_button"] = cancel_button
 
-    def general_info_render(self):
+    def _general_info_render(self):
         # ========== Informações gerais ==============
         info = ttk.Frame(self.main, padding=5)
         self.sub_windows_status["info"] = False
@@ -79,7 +89,7 @@ class App(tk.Tk):
         self.feedback["extracted_pages"] = extracted_pages
         self.feedback["error_pages"] = error_pages
 
-    def status_bar_render(self):
+    def _status_bar_render(self):
         frm = ttk.Frame(self)
         frm.pack(fill="both", expand=True, side="bottom")
 
@@ -91,15 +101,20 @@ class App(tk.Tk):
         status_label = ttk.Label(frm, text="", relief="flat")
         status_label.pack(side="left", anchor="w")
 
+        # ========== File status =========
+        status_file = ttk.Label(frm, text="", relief="flat")
+        status_file.pack(side="left", anchor="e")
+
         timer_label = ttk.Label(frm, text="", relief="flat")
         timer_label.pack(side="right", anchor="w")
 
         self.feedback["progress_bar"] = progress_bar
         self.feedback["status_label"] = status_label
+        self.feedback["status_file"] = status_file
         self.feedback["timer_label"] = timer_label
 
 
-    def open_sub_window(self, sub_window):
+    def _open_sub_window(self, sub_window):
         if self.sub_windows_status.get(sub_window):
             return
 
@@ -108,14 +123,4 @@ class App(tk.Tk):
 
         self.sub_windows_status[sub_window] = True
         sub_window(on_close_cb)
-
-
-    def render(self):
-        self.top_bar_render()
-        self.main_render()
-        self.pdf_entry_render()
-        self.actions_render()
-        self.general_info_render()
-        self.status_bar_render()
-        self.mainloop()
 
