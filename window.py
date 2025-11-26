@@ -1,20 +1,24 @@
 import tkinter as tk
+import threading
 
 from tkinter import ttk
+
 from data_var import data_var
-from parser import handle_process
 from utils import set_configuration_directory
 from config import Config
+from ocr_parser import OcrParser, DefaultOcrParser
+
 
 class App(tk.Tk):
-    def __init__(self):
+    def __init__(self, ocr_parser: OcrParser = DefaultOcrParser):
         super().__init__()
         super().title("Atlas")
-        super().geometry("640x280")
+        super().geometry("540x280")
         super().resizable(False, False)
         self.main = None
         self.feedback = {}
         self.sub_windows_status = {}
+        self.ocr_parser = ocr_parser
 
     def render(self):
         self._top_bar_render()
@@ -55,7 +59,7 @@ class App(tk.Tk):
         # ========== Botão de processamento ========
         process_button = ttk.Button(self.main, text="Processar", width=15)
         process_button.grid(row=1, column=1, pady=10, padx=5)
-        process_button.config(command=lambda: handle_process(self.feedback))
+        process_button.config(command=self._handle_sub_process)
 
         cancel_button = ttk.Button(self.main, text="Cancelar", width=15)
         cancel_button.grid(row=1, column=0, pady=10, padx=5, sticky="e")
@@ -124,3 +128,23 @@ class App(tk.Tk):
         self.sub_windows_status[sub_window] = True
         sub_window(on_close_cb)
 
+    def _handle_sub_process(self):
+        self.feedback["process_button"]["text"] = "Processando..."
+        self.feedback["process_button"]["state"] = "disabled"
+        self.feedback["cancel_button"]["state"] = "normal"
+        self.feedback["progress_bar"]['value'] = 0
+
+        def worker():
+            try:
+                self.feedback["info"]()
+                self.ocr_parser.process(self.feedback)
+            except Exception as e:
+                self.feedback["status_label"]["text"] = f"❌ Erro: {e}"
+                self.feedback["progress_bar"]['value'] = 0
+            finally:
+                self.feedback["process_button"]["state"] = "normal"
+                self.feedback["process_button"]["text"] = "Processar"
+                self.feedback["cancel_button"]["state"] = "disabled"
+                self.feedback["info"]()
+
+        threading.Thread(target=worker, daemon=True).start()
