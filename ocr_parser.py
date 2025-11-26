@@ -64,7 +64,7 @@ class DefaultOcrParser(OcrParser):
 
     def _process_file(self, file_path):
         self._display_message_on_label("status_file",
-                                       "   |   Convertendo arquivo para imagens")
+                                       "    Convertendo arquivo para imagens...")
         images = self._pdf_parser.pdf_to_image(file_path)
 
         file_total_pages = len(images)
@@ -73,7 +73,7 @@ class DefaultOcrParser(OcrParser):
         for i, image in enumerate(images, start=1):
             page_text = self._cnn_ai_model.process_image(image)
             self._display_message_on_label("status_file",
-                                           f"   |   Processando página {i}/{file_total_pages}")
+                                           f"    Processando página {i}/{file_total_pages}...")
             self._successful_pages += self._process_page(page_text, i)
 
     def _process_page(self, page_text, page_number):
@@ -97,7 +97,7 @@ class DefaultOcrParser(OcrParser):
         self._display_message_on_label("timer_label",
                                        f"Tempo estimado: {self._calculate_time_estimative(file_index)} segundos")
         self._display_message_on_label("status_label",
-                                       f"Processando arquivo {file_index}/{self._total_files}")
+                                       f"Processando arquivo {file_index}/{self._total_files}...")
 
     def _calculate_time_estimative(self, file_index):
         self._recalculate_total_time_estimative()
