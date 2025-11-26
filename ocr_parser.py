@@ -28,7 +28,7 @@ class DefaultOcrParser(OcrParser):
         r"Valor:[\s]+R\$\s*(?P<VALOR>[\d.,]+)"
         , re.DOTALL | re.IGNORECASE | re.MULTILINE | re.UNICODE)
 
-    _estimative_per_file = 120
+    _estimative_per_file = 1200
     _total_estimative = 120
     _total_pages = 0
     _total_files = 0
@@ -95,13 +95,13 @@ class DefaultOcrParser(OcrParser):
 
     def _actualize_timer_info(self, file_index):
         self._display_message_on_label("timer_label",
-                                       f"Tempo estimado: {self._calculate_time_estimative(file_index)} segundos")
+                                       f"Tempo estimado: {self._calculate_time_estimative(file_index)} horas")
         self._display_message_on_label("status_label",
                                        f"Processando arquivo {file_index}/{self._total_files}...")
 
     def _calculate_time_estimative(self, file_index):
         self._recalculate_total_time_estimative()
-        return round(self._total_estimative - (file_index * self._estimative_per_file))
+        return round((self._total_estimative - (file_index * self._estimative_per_file)) / (60 * 60), 2)
 
     def _recalculate_total_time_estimative(self):
         self._total_estimative = self._total_files * self._estimative_per_file
