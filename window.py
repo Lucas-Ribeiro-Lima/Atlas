@@ -10,7 +10,7 @@ from ocr_parser import OcrParser, DefaultOcrParser
 
 
 class App(tk.Tk):
-    def __init__(self, ocr_parser: OcrParser = DefaultOcrParser):
+    def __init__(self, ocr_parser: OcrParser = None):
         super().__init__()
         super().title("Atlas")
         super().geometry("540x280")
@@ -18,7 +18,7 @@ class App(tk.Tk):
         self.main = None
         self.feedback = {}
         self.sub_windows_status = {}
-        self.ocr_parser = ocr_parser
+        self.ocr_parser = ocr_parser or DefaultOcrParser(self.feedback)
 
     def render(self):
         self._top_bar_render()
@@ -137,7 +137,7 @@ class App(tk.Tk):
         def worker():
             try:
                 self.feedback["info"]()
-                self.ocr_parser.process(self.feedback)
+                self.ocr_parser.process(data_var["BASE_PATH"])
             except Exception as e:
                 self.feedback["status_label"]["text"] = f"❌ Erro: {e}"
                 self.feedback["progress_bar"]['value'] = 0

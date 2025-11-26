@@ -8,5 +8,5 @@ class PdfParser(ABC):
 
 
 class Pdf2Image(PdfParser):
-    def pdf_to_image(self, pdf_file):
-        return convert_from_path(pdf_file, dpi=300, thread_count=5)
+    def pdf_to_image(self, pdf_path):
+        return convert_from_path(pdf_path, dpi=300, thread_count=5)

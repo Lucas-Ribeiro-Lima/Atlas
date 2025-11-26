@@ -10,7 +10,7 @@ from tkinter import messagebox
 
 class OcrParser(ABC):
     @abstractmethod
-    def process(self, dir_path):
+    def process(self, dir_path: str):
         pass
 
 class DefaultOcrParser(OcrParser):
@@ -36,9 +36,9 @@ class DefaultOcrParser(OcrParser):
 
     def __init__(self,
                  feedback: dict[str, dict[str, str]],
-                 cnn_ai_model: CnnAiModel = Pytesseract,
-                 pdf_parser: PdfParser = Pdf2Image,
-                 csv_writer: CsvWriter = DefaultCsvWriter):
+                 cnn_ai_model: CnnAiModel = Pytesseract(),
+                 pdf_parser: PdfParser = Pdf2Image(),
+                 csv_writer: CsvWriter = DefaultCsvWriter()):
         self._feedback = feedback
         self._pdf_parser = pdf_parser
         self._cnn_ai_model = cnn_ai_model
@@ -62,10 +62,10 @@ class DefaultOcrParser(OcrParser):
 
         self._display_conclude_message()
 
-    def _process_file(self, file):
+    def _process_file(self, file_path):
         self._display_message_on_label("status_file",
                                        "   |   Convertendo arquivo para imagens")
-        images = self._pdf_parser.pdf_to_image(file)
+        images = self._pdf_parser.pdf_to_image(file_path)
 
         file_total_pages = len(images)
         self._total_pages += file_total_pages
