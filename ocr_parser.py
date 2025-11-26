@@ -68,7 +68,7 @@ class DefaultOcrParser(OcrParser):
         self._total_files = len(files)
         self._successful_pages = 0
 
-        for file_index, file in enumerate(files):
+        for file_index, file in enumerate(files, start=1):
             start_time = time.perf_counter()
             self._actualize_timer_info(file_index)
 
